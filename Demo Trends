@@ -1,0 +1,184 @@
+#Ultized US CENSUS BERAU FOR DEMOGRAPHICS AND SOCIAL MEDIA DEMOGRAPHICS USED HERE.
+#FALL BACK DATA USED TO CORRECT IMMEDIATE ERRORS.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import numpy as np
+from scipy.stats import pearsonr, spearmanr
+
+years = [2014, 2016, 2018, 2020, 2022, 2024]
+data = {
+    "turnout_rate":              [0.367, 0.601, 0.500, 0.668, 0.462, 0.623],
+    "total_voters":              [83.5e6, 138.8e6, 118e6, 158.4e6, 112e6, 155e6],
+    "voters_age_18_29":          [9.2e6, 24e6, 16e6, 27e6, 14e6, 25e6],
+    "voters_age_30_44":          [18.5e6, 32e6, 26e6, 37e6, 24e6, 35e6],
+    "voters_age_45_64":          [35e6, 51e6, 43e6, 57e6, 41e6, 53e6],
+    "voters_age_65_plus":        [20e6, 30e6, 29e6, 38e6, 31e6, 36e6],
+    "voters_white":              [68e6, 101e6, 86e6, 112e6, 82e6, 105e6],
+    "voters_black":              [9e6, 16e6, 13e6, 17e6, 11e6, 15e6],
+    "voters_hispanic":           [3e6, 11e6, 8e6, 13e6, 7e6, 12e6],
+    "voters_asian":              [1.5e6, 4e6, 3e6, 5e6, 2.5e6, 5e6],
+    "voters_income_low":         [10e6, 15e6, 12e6, 18e6, 11e6, 17e6],
+    "voters_income_mid":         [30e6, 45e6, 36e6, 52e6, 34e6, 50e6],
+    "voters_income_high":        [43.5e6, 78.8e6, 70e6, 88.4e6, 67e6, 88e6],
+    "facebook_users_total":      [1.32e9, 1.86e9, 2.27e9, 2.74e9, 2.91e9, 3.0e9],
+    "facebook_youth":            [0.71, 0.68, 0.65, 0.63, 0.60, 0.58],
+    "instagram_users_total":     [0.3e9, 0.5e9, 1.0e9, 1.22e9, 1.44e6*1000, 1.65e9],
+    "instagram_youth":           [0.53, 0.59, 0.64, 0.67, 0.72, 0.76],
+    "tiktok_users_total":        [0, 10e6, 500e6, 689e6, 1.05e9, 1.56e9],
+    "tiktok_youth":              [0.00, 0.01, 0.22, 0.42, 0.45, 0.47],
+    "youtube_users_total":       [1.0e9, 1.3e9, 1.9e9, 2.29e9, 2.48e9, 2.5e9],
+    "youtube_youth":             [0.82, 0.84, 0.88, 0.90, 0.93, 0.95],
+    "snapchat_users_total":      [100e6, 158e6, 191e6, 265e6, 347e6, 422e6],
+    "snapchat_youth":            [0.40, 0.38, 0.37, 0.35, 0.33, 0.30],
+    "linkedin_users_total":      [300e6, 467e6, 590e6, 740e6, 830e6, 1000e6],
+    "linkedin_youth":            [0.30, 0.31, 0.33, 0.35, 0.35, 0.34],
+    "pinterest_users_total":     [73e6, 150e6, 250e6, 416e6, 445e6, 498e6],
+    "pinterest_youth":           [0.40, 0.42, 0.41, 0.39, 0.40, 0.42],
+}
+#THIS IS BASED ON THE DATA THAT IS IN THE FILE! I did so that if my data fails it is overrided automatically.
+df = pd.DataFrame(data, index=years)
+trend_df = pd.DataFrame(index=years)
+
+for col in df.columns:
+    trends = []
+    for i in range(len(years)):
+        if i == 0:
+            trends.append(0.0)
+        else:
+            prev = df[col].iloc[i-1]
+            curr = df[col].iloc[i]
+            if pd.isna(prev) or pd.isna(curr) or prev == 0:
+                trends.append(None)
+            else:
+                trend = (curr - prev) / prev
+                trends.append(trend)
+    trend_df[col] = trends
+
+target_trend = trend_df["turnout_rate"]
+
+def get_corr(x, y):
+    values_x = []
+    values_y = []
+    for i in range(len(x)):
+        vx = x.iloc[i]
+        vy = y.iloc[i]
+        if pd.isna(vx) or pd.isna(vy):
+            continue
+        values_x.append(vx)
+        values_y.append(vy)
+    if len(values_x) < 2:
+        return None, None
+    p, _ = pearsonr(values_x, values_y)
+    s, _ = spearmanr(values_x, values_y)
+    return p, s
+scores = []
+
+for col in df.columns:
+    if col == "turnout_rate":
+        continue  
+    
+    p, s = get_corr(trend_df[col], target_trend)
+    
+    if pd.isna(p):
+        score = 0.0
+    else:
+        score = abs(p)
+    
+    pearson_val = None
+    if not pd.isna(p):
+        pearson_val = round(p, 4)
+    
+    spearman_val = None
+    if not pd.isna(s):
+        spearman_val = round(s, 4)
+    
+    scores.append({
+        "Metric": col,
+        "Pearson": pearson_val,
+        "Spearman": spearman_val,
+        "Score": round(score, 4)
+    })
+
+scores_df = pd.DataFrame(scores)
+scores_df = scores_df.sort_values(by="Score", ascending=False)
+scores_df.to_csv("/content/demographics_trends_feature_scores.csv", index=False)
+
+records = []
+
+for col in df.columns:
+    if col == "turnout_rate":
+        continue
+    
+    p, s = get_corr(trend_df[col], target_trend)
+    
+    if pd.isna(p):
+        score = 0.0
+    else:
+        score = abs(p)
+    
+    pearson_out = None
+    if not pd.isna(p):
+        pearson_out = round(p, 4)
+    
+    spearman_out = None
+    if not pd.isna(s):
+        spearman_out = round(s, 4)
+    
+    for i in range(len(years)):
+        year = years[i]
+        raw = df[col].iloc[i]
+        trend = trend_df[col].iloc[i]
+        
+        raw_val = None
+        if not pd.isna(raw):
+            if "youth" in col or "rate" in col:
+                raw_val = round(raw, 4)
+            else:
+                raw_val = int(raw)
+        
+        trend_val = None
+        if not pd.isna(trend):
+            trend_val = round(trend, 4)
+        
+        category = "Election"  
+        if "facebook" in col:
+            category = "SocialMedia"
+        elif "instagram" in col:
+            category = "SocialMedia"
+        elif "tiktok" in col:
+            category = "SocialMedia"
+        elif "youtube" in col:
+            category = "SocialMedia"
+        elif "snapchat" in col:
+            category = "SocialMedia"
+        elif "linkedin" in col:
+            category = "SocialMedia"
+        elif "pinterest" in col:
+            category = "SocialMedia"
+        
+        records.append({
+            "Metric": col,
+            "Year": year,
+            "RawValue": raw_val,
+            "Trend": trend_val,
+            "PearsonCorr": pearson_out,
+            "SpearmanCorr": spearman_out,
+            "Score": round(score, 4),
+            "Category": category
+        })
+
+final_df = pd.DataFrame(records)
+final_df.to_csv("/content/demographics_trends_correlations_full.csv", index=False)
