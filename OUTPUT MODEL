@@ -1,0 +1,277 @@
+#OUTPUT MODEL, ALL BINARY LOGIC AND FACTORS ARE BASED ON THE USER'S INFORMATION FROM INTERNET READING COUNTLESS ARTICLES. Inspired by Litchman's model. 
+
+
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+import os
+import joblib
+from  sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.metrics import mean_squared_error, mean_absolute_error, f1_score
+import tensforflow as tf
+from tensflow.keras import layers, models
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.models import Model
+warnings.filterwarings('ignore')
+from sklearn.linear_model import LinearRegression
+from scipy.stats import ttest_ind, norm
+class EconomicTrendsProcessor:
+    def __init__(self, csv_path="economic_trends_correlations_feature_scores.csv", cache_file="economic_trends_cache.joblib"):
+        self.csv_path = csv_path
+        self.cache_file = cache_file
+        self.data_by_year = {}
+        self.scaler = StandardScaler()
+        self.feature_vector=[]
+        self.score_matrix=np.array([])
+    def load_correlation_data(self):
+        df=pd.read_csv(self.csv_path)
+        self.score_colums=['Metric','Pearson','Spearman','Score']
+        self.scorematrix=df[self.score_colums].to_numpy()
+        self.feature_vector=self.scorematrix.tolist()
+    def displaydata(self):
+      print(self.scorematrix.shape)
+      print(self.score_matrix)
+      print(self.feature_vector)
+
+class NewsSentimentProcessor:
+    def __init__(self, csv_path="neutral_texts (1).csv", cache_file="news_sentiment_cache.joblib"):
+        self.csv_path = csv_path
+        self.cache_file = cache_file
+        self.data_by_year = {}
+        self.scaler = StandardScaler()
+        self.feature_vector=[]
+        self.score_matrix=np.array([])
+    def load_correlation_data(self):
+        df=pd.read_csv(self.csv_path)
+        #To much data so isolated to 25. Hopefully works!
+        s_df=df.sample(n=384,random_state=42)
+        self.score_colums=['neutral_texts','sentiment_scores']
+        self.scorematrix=s_df[self.score_colums].to_numpy()
+        self.feature_vector=self.scorematrix.tolist()
+    def displaydata(self):
+      print(self.scorematrix.shape)
+      print(self.score_matrix)
+      print(self.feature_vector)
+class DemographicsTrendsProcessor:
+    def __init__(self, csv_path="demographics_trends_correlations_full.csv", cache_file="demographic_trends_cache.joblib"):
+        self.csv_path = csv_path
+        self.cache_file = cache_file
+        self.scaler = StandardScaler()
+        self.feature_vector=[]
+        self.score_matrix=np.array([])
+    def load_correlation_data(self):
+        df=pd.read_csv(self.csv_path)
+        s_df=df.sample(n=25,random_state=42)
+        self.score_columns=['Metric','Year','RawValue','Trend','PearsonCorr','SpearmanCorr','Score','Category']
+        self.scorematrix=s_df[self.score_columns].to_numpy()
+        self.feature_vector=self.scorematrix.tolist()
+    def displaydata(self):
+      print(self.scorematrix.shape)
+      print(self.score_matrix)
+      print(self.feature_vector)
+class DataProcessor:
+    def __init__(self,factors):
+      self.factors=factors
+    def buildmodel(input=419,factorstotal=11):
+      input=Input(shape=(input)), name='input'
+      #First LAyer :)
+      x=Dense(128, activation='relu')(input)
+      x=Dropout(0.4)(x)
+      #Second Layer :)
+      x=Dense(64, activation='relu')(x)
+      x=Dropout(0.3)(x)
+      #THIRD LAYER MWAHAHA
+      x=Dense(32,activation='relu')(x)
+      #Sigmoid layer (11+1)
+      outputL=Dense(units=(factorstotal+1), activation='sigmoid',)(x)
+      model=Model(inputs=input, outputs=outputL)
+      #MODEL!
+      model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy'])
+      return model
+class simulationswhichisgood:
+  def __init__(self, processor, factors):
+    self.processor=processor
+    self.factgors=factors
+    self.cv_res=[]
+    self.simRES={}
+    self.infrenRES={}
+  def crossvalidatingstuff(self,xd,yd):
+      tscv=TimeSeriesSplit(n_splits=4)
+      fold=1
+      for train_index,test_index in tcsv.split(xd):
+        xt=xd[train_index]
+        yt=yd[train_index]
+        xte=xd[test_index]
+        yte=yd[test_index]
+        model.fit(xt,yt)
+        #only reason I let the vairables equal xt,yt, xte, and yte is cause I am sick and tired of writing
+        model=self.buildmodel
+        h=model.fit(xt,yt,batchsize=2, epochs=100,verbose=0)
+        self.history.append(h)
+        yrpred=model.predict(xte)
+        #astype(int) coverts our favorite bools into numbers YAY!
+        ybpred=(yrpred>0.5).astype(int)
+        #r=raw,b=binary, my hands are tired
+        mae=mean_absolute_error(yte,yrpred)
+        f1=f1_score(yte,ybpred)
+        metricseval=model.evaluate(xte,yte,verbose=0)
+        resultsfold={fold,test_index.tolist(),'MAE:',mae,'F1_score',f1,metricseval[0],'Test_accuracy',metricseval[1],'Test_mape',metricseval[2]}
+        #Fold, Test_loss, Test_years were not stated to save time and energy!
+        self.metric_res.append(resultsfold)
+        print("MAE:",mae:.4f,"F1:",f1:.4f,"Test MAPE:",metricseval[1]:.4f,"Accuracy:",metricseval[1]:4f)
+        fold+=1
+        for r in self.metrics_res:
+            print("MAE:",r['MAE']:.4f,"F1:",r['F1_sccore']:4f,"Test MAPE:",r['Test_mape']:4f,"Accuracy:",r['Test_accuracy']:4f)
+        return self.metrics_res
+  def metrictimeyahoo(self,y_t,yrpred):
+      ybpred=(yrpred>0.5).astpye(int)
+      mse=mean_squared_error(y_t,yrpred)
+      mae=mean_absolute_error(y_t,yrpred)
+      f1=f1_score(y_t,yrpred)
+      ytfalt=y_t.flatten()
+      ypflat=ybpred.flatten()
+      accuracy=accuracy_score(ytflat,ypflat)
+      mape=(1-accuracy)*100
+      return mse, mae, f1, mape
+  def timeforsimulations(self,xdt,ydt,x_2024,n_simulations=50):
+    factorsfor2024=np.array([1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1]).astype(int)
+    #1=True, 0=False, IN THIS Election all True factors favors DEMs and False favors Rep
+    actualwinner=0 #Republicans win both chambers
+    simulation_data=[]
+    for i in range(1,n_simulations+1):
+      np.random.speed(i)
+      tf.random.set_seed(i)
+      model=self.processor.buildmodel()
+      model.fit(xdt,ydt,batchsize=2,epoches=100, verbose=0)
+      yrpred_2024=model.predict(x_2024,verbose=0)
+      ybpred_2024=(yrpred_2024>0.5).astype(int)
+      yrpredfactors_2024=yrpred_2024[0, :11]
+      ybpredfactors_2024=ybpred_2024[0, :11]
+      correct_factors=np.sum(factorsfor2024==ybpredfactors_2024)
+      mape=(11-correct_factors)/11
+      #Ratio of incorrect factors!!!
+      mse=self.metrictimeyahoo(ydt,yrpred_2024)
+      mae=self.metrictimeyahoo(ydt,yrpred_2024)
+      f1=self.metrictimeyahoo(ydt,yrpred_2024)
+      incumbent=np.sum(ybpred_2024)
+      if incumbent>=6:
+        predicted_winner=1
+      else:
+        predicted_winner=0
+      if predicted_winner==actualwinner:
+        predictioncorrect=1
+      else:
+        predictioncorrect=0
+      simulation_data.append({'raw_prediction':yrpred_2024.flatten(),'predicted_winner':predicted_winner,'correct_factors':correct_factors,'mape':mape,'prediction_correct': predictioncorrect,'mse':,mse,'mae':mae.'f1':f1})
+    dfsim=pd.DataFrame(simulation_data)
+    finalprediction_avg=df_sim['raw prediction'].apply(pd.Series).mean().values()
+    self.simulation_results = {'df_sim': dfsim,'n_simulations': n_simulations,
+            'final_avg_prediction':finalprediction_avg,'overall_prediction_accuracy': dfsim['prediction_correct_indicator'].mean(),'mean_mse': dfsim['mse'].mean(),'mean_mae': dfsim['mae'].mean(),'mean_f1': dfsim['f1'].mean(),'mean_mape': dfsim['mape'].mean() * 100}
+    return self.simulation_results
+  def statstime(self,xd,yd,featurenames,winner_name='Winner'):
+    for i in range(xd.shape[1])):
+      df=pd.DataFrame(xd,columns=[f'Features_{i}'])
+    df[winner_name]=yd[:,-1]
+    namesoffactors=self.factors[:-1]
+    fd=pd.DataFrame(yd[:,:-1],column=factor_names)
+    ttestresults={}
+    for factor in factor_names:
+      winner=fd.loc[df[winner_name==1],factor]
+      loser=fd.loc[df[winner_name]==0,factor]
+      t_statistic=stats.ttest_ind(winner,loser,equal_Var=False)
+      ttestresults[factor]={'t_value':t_statistic,'p_value':p_value,'significant':p_value<0.05}
+      Ylpm=df[winner_name]
+      xlpm=sm.add_constan(fd)
+      lpm_model=sm.OLS(Ylpm,XLpm).fit()
+      lpm_results={'R_squared':lpm_model.rsqaured,'Coefficients_Pvalues':lpm_model.summary2().tables[1][['Coef.', 'P>t']].to_dict('index')}
+      return {'t_test_results':ttestresults,'lpm_results':lpm_results}
+class Visualizer:
+  def __init__(self,metrics_res,simulation_result, factors):
+    self.sim_df=simulation_result['df_sim']
+    self.finalprediction_avg=simulation_result['finalprediction_avg']
+    self.cv_df=pd.Dataframe(simulation_result)
+    self.factors=factors
+  def generate_all_plots(self):
+    fig=plt.subplots(3,2,figsize=(18,18))
+    plt.subplots_adjust(hspace=0.4,wspace=0.3)
+    axes[0,0].set_title('Predicted Party Favorability (50 Runs)')
+    winner_counts=self.simulation_df['predicted_winner'].value_counts()
+    for w in winner_counts.index:
+      if w == 1:
+        labels ='Democrat'
+      else:
+        labels='Republican'
+    axes[0, 0].pie(winner_counts.values, labels=labels, autopct='%1.1f%%', startangle=90, colors=['skyblue', 'salmon'])
+    axes[0, 0].axis('equal')
+    axes[0, 1].set_title('Factor Prediction Correctness vs Actual (Mean MSE)')
+    total_correct = self.sim_df['correct_factors'].sum()
+    total_incorrect = (50 * 11) - total_correct
+    axes[0, 1].pie([total_correct, total_incorrect], labels=['Correct Factors', 'Incorrect Factors'], autopct='%1.1f%%', startangle=90, colors=['lightgreen', 'tomato'])
+    axes[0, 1].axis('equal')
+    axes[1, 0].set_title('Heatmap: Factor Correctness Across 50 Runs')
+    factor_correct_matrix = np.random.randint(0, 2, size=(50, 11))
+    sns.heatmap(factor_correct_matrix, cmap='RdGn', cbar=True, ax=axes[1, 0], xticklabels=self.factors[:-1], yticklabels=False)
+    axes[1, 0].set_xlabel('Factors')
+    axes[1, 0].set_ylabel('Simulation Run')
+    axes[1, 1].set_title('Predicted vs. Actual Factor Values (Mean across 50 Runs)')
+    true_2024_factors = np.array([1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1]).astype(float)
+    predicted_factors_mean = self.finalprediction_avg[:11]
+    df_bar = pd.DataFrame({'Factor': self.factors[:-1],'Actual Value': true_2024_factors,'Predicted Mean': predicted_factors_mean})
+    df_bar_melt = df_bar.melt('Factor', var_name='Type', value_name='Value')
+    sns.barplot(x='Factor', y='Value', hue='Type', data=df_bar_melt, ax=axes[1, 1])
+    axes[1, 1].set_xticklabels(axes[1, 1].get_xticklabels(), rotation=45, ha='right')
+    axes[1, 1].set_ylim(0, 1.1)
+    axes[2, 0].set_title('Metric Trends Across 50 Simulation Runs')
+    axes[2, 0].plot(self.simulation_df['sim_id'], self.simulation_df['mse'], label='MSE', alpha=0.7)
+    axes[2, 0].plot(self.simulation_df['sim_id'], self.simulation_df'mae'], label='MAE', alpha=0.7)
+    axes[2, 0].plot(self.simulation_df['sim_id'], self.simulation_df['f1'], label='F1 Score', alpha=0.7)
+    axes[2, 0].plot(self.v['sim_id'], self.simulation_df['mape'], label='MAPE (Custom)', alpha=0.7)
+    axes[2, 0].legend()
+    axes[2, 0].set_xlabel('Simulation Run')
+    axes[2, 0].set_ylabel('Metric Value')
+    axes[2, 1].set_title('Distribution of Metrics Across 50 Runs')
+    metrics_to_plot = self.simulation_df[['mse', 'mae', 'f1', 'mape']].copy()
+    metrics_to_plot.columns = ['MSE', 'MAE', 'F1 Score', 'MAPE (Dec)']
+    sns.boxplot(data=metrics_to_plot, ax=axes[2, 1])
+    plt.tight_layout()
+    plt.show()
+  def main():
+    samples=1
+    totalsamples=5*samples
+    xd=np.random.rand(totalsamples,419)
+    factorshistory=np.random.randint(0,2,size=(totalsamples,11))
+    winnerhistory=np.random.randint(0,2,size=(totalsamples,1))
+    yd=np.hstack([factorshistory, winnerhistory])
+    x_2024_d=np.random.rand(1,419)
+    factors = [
+        "Party_Leadership", "Party_Popularity", "Economic_Criticism",
+        "Opposition_Polling_Strength", "Economy", "Redistricting_Impact",
+        "Social_Momentum", "Foreign_Policy_Critique", "Voter_Engagement",
+        "Incumbent_party_advantage", "Media_Sentiment_Favorability", "Winner"
+    ]
+    processor = DataProcessor(factors=factors)
+    engine = timeforsimulations(processor, factors)
+    cv_df = engine.crosssvalidatingstuff(xd, Yd, n_splits=4)
+    sim_output = engine.run_simulations(xd, yd, X_2024_d, n_simulations=50)
+    inferential_results = engine.run_inferential_stats(xd,yd)
+    f_df=metrictimeyahoo(y_t,yrpred)
+    visualizer = Visualizer(engine)
+    visualizer.generate_all_plots()
+    print(f"Overall Prediction Accuracy: {sim_output['overall_prediction_accuracy']*100:.2f}%")
+    print(f"Mean Mean MSE: {f_df['MSE'].mean():.4f}")
+    print(f"Mean Mean MAE: {f_df['MAE'].mean():.4f}")
+    print(f"Mean Mean F1 Score: {f_df['F1'].mean():.4f}")
+    print(f"Mean Mean MAPE: {f_df['MAPE'].mean():.4f}")
+    print(f"Mean test accuracy: {cv_df['Test_accuracy'].mean():.4f}")
+    print(f"Mean CV MAE: {cv_df['MAE'].mean():.4f}")
+    print(f"Mean CV F1 Score: {cv_df['F1'].mean():.4f}")
+    print(f"Mean CV MAPE: {cv_df['MAPE'].mean():.4f}")
+
+#Running main. 
+    main()
