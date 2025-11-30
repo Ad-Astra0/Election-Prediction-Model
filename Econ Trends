@@ -1,0 +1,125 @@
+#Economic Trends Applied. 2014 values are 0. 
+
+import pandas as pd
+import numpy as np
+from scipy.stats import pearsonr, spearmanr
+df = pd.read_csv("economic_indicators_2014_2023.csv")
+metrics = [
+    "GDP (Billions USD)", "GDP Growth (%)", "S&P 500 Close", "S&P 500 Return (%)",
+    "Initial Jobless Claims (Avg Weekly, Thousands)", "Unemployment Rate (%)",
+    "CPI (Annual %)", "10-Year Treasury Yield (%)", "GDP per Capita PPP (Int$)",
+    "Budget Deficit (% GDP)"
+]
+
+for col in metrics:
+    df[col] = pd.to_numeric(df[col], errors='coerce')
+    df[col] = df[col].interpolate(method='linear', limit_direction='both')
+
+trend_df = pd.DataFrame({'Year': df['Year']})
+for col in metrics:
+    trends = []
+    for i in range(len(df)):
+        if i == 0:
+            trends.append(0.0)
+        else:
+            prev = df[col].iloc[i-1]
+            curr = df[col].iloc[i]
+            if pd.isna(prev) or pd.isna(curr) or prev == 0:
+                trends.append(np.nan)
+            else:
+                trend_value = (curr - prev) / prev
+                trends.append(trend_value)
+    trend_df[col + "_trend"] = trends
+
+target_trend = trend_df["GDP Growth (%)_trend"]
+def get_corrs(x, y):
+    x_clean = pd.Series(x).dropna()
+    y_clean = pd.Series(y).dropna()
+    if len(x_clean) < 2 or len(y_clean) < 2:
+        return np.nan, np.nan
+    combined = pd.concat([x_clean, y_clean], axis=1).dropna()
+    if len(combined) < 2:
+        return np.nan, np.nan
+    p, _ = pearsonr(combined.iloc[:, 0], combined.iloc[:, 1])
+    s, _ = spearmanr(combined.iloc[:, 0], combined.iloc[:, 1])
+    return p, s
+
+correlation_cache = {}
+for col in metrics:
+    if col == "GDP Growth (%)":
+        continue
+    trend_col = col + "_trend"
+    p, s = get_corrs(trend_df[trend_col], target_trend)
+    
+    if pd.isna(p):
+        score = 0.0
+    else:
+        score = abs(p)
+    
+    correlation_cache[col] = {"pearson": p, "spearman": s, "score": score}
+scores = []
+for col, vals in correlation_cache.items():
+    pearson_val = vals["pearson"]
+    spearman_val = vals["spearman"]
+    
+    if pd.isna(pearson_val):
+        pearson_rounded = None
+    else:
+        pearson_rounded = round(pearson_val, 4)
+    
+    if pd.isna(spearman_val):
+        spearman_rounded = None
+    else:
+        spearman_rounded = round(spearman_val, 4)
+    
+    scores.append({
+        "Metric": col,
+        "Pearson": pearson_rounded,
+        "Spearman": spearman_rounded,
+        "Score": round(vals["score"], 4)
+    })
+scores_df = pd.DataFrame(scores)
+scores_df = scores_df.sort_values(by="Score", ascending=False)
+scores_df.to_csv("economic_trends_correlations_feature_scores.csv", index=False)
+records = []
+for col in metrics:
+    if col == "GDP Growth (%)":
+        continue
+    
+    trend_col = col + "_trend"
+    cached = correlation_cache.get(col, {"pearson": None, "spearman": None, "score": 0.0})
+    
+    for i in range(len(df)):
+        year = int(df["Year"].iloc[i])
+        raw = df[col].iloc[i]
+        trend = trend_df[trend_col].iloc[i]
+        
+        if pd.isna(raw):
+            raw_value = None
+        else:
+            raw_value = round(raw, 2)
+        if pd.isna(trend):
+            trend_value = None
+        else:
+            trend_value = round(trend, 4)
+        if cached["pearson"] is None:
+            pearson_corr = None
+        else:
+            pearson_corr = round(cached["pearson"], 4)
+        if cached["spearman"] is None:
+            spearman_corr = None
+        else:
+            spearman_corr = round(cached["spearman"], 4)
+        
+        records.append({
+            "Metric": col,
+            "Year": year,
+            "RawValue": raw_value,
+            "Trend": trend_value,
+            "PearsonCorr": pearson_corr,
+            "SpearmanCorr": spearman_corr,
+            "Score": round(cached["score"], 4),
+            "Category": "Economic"
+        })
+out_df = pd.DataFrame(records)
+out_df.to_csv("economic_trends_correlations.csv", index=False)
