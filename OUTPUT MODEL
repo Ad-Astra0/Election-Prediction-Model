@@ -38,7 +38,15 @@ class EconomicTrendsProcessor:
       print(self.scorematrix.shape)
       print(self.score_matrix)
       print(self.feature_vector)
-
+    def binary by year:
+        y_winner = np.array([[0],[0],[1],[1],[0]])
+        y_factors = np.array([
+            [1,0,0,0,1,0,0,1,1,0,0],
+            [0,0,1,1,0,0,1,0,1,0,1],
+            [0,0,0,1,1,0,0,1,0,0,1],
+            [0,0,0,0,0,1,1,0,1,0,0],
+            [1,0,1,0,1,0,0,1,0,0,1]
+        ])
 class NewsSentimentProcessor:
     def __init__(self, csv_path="neutral_texts (1).csv", cache_file="news_sentiment_cache.joblib"):
         self.csv_path = csv_path
@@ -139,7 +147,11 @@ class simulationswhichisgood:
       accuracy=accuracy_score(ytflat,ypflat)
       mape=(1-accuracy)*100
       return mse, mae, f1, mape
-  def timeforsimulations(self,xdt,ydt,x_2024,n_simulations=50):
+  def timeforsimulations(self,xdt,ydt,x_2024,n_simulations=50,y_factors,y_winners):
+    yfd=[0,0,1,1,0]
+    y_winners=yfd
+    y_factors=self.factortrain.
+    model.train(self.factortrain)
     factorsfor2024=np.array([1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1]).astype(int)
     #1=True, 0=False, IN THIS Election all True factors favors DEMs and False favors Rep
     actualwinner=0 #Republicans win both chambers
