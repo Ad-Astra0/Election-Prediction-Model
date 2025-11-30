@@ -1,0 +1,67 @@
+#News Sentiment!
+#used /content/ as this was ran in GOOGLE Collab.
+
+
+
+
+
+import json
+import zipfile
+import pandas as pd
+import os
+from sentence_transformers import SentenceTransformer
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+with zipfile.ZipFile("/content/archive.zip", 'r') as zip_ref:
+    zip_ref.extractall("/content/unzipped_data")
+jsonl_path = "/content/unzipped_data/News_Category_Dataset_v3.json"
+texts = []
+labels = []
+violence_words = {"riot", "assassinate", "terror", "bomb", "militant", "shooting", "attack", "killed", "murder"}
+allowed_categories = ["POLITICS", "BUSINESS", "TECH", "WORLD NEWS", "U.S. NEWS"]
+
+with open(jsonl_path, 'r') as f:
+    for line in f:
+        item = json.loads(line.strip())
+        text = item["short_description"] or item["headline"]
+        cat = item["category"]
+        
+        if cat not in allowed_categories:
+            continue
+        violence=False
+        for word in violence_words:
+          if word in text.lower():
+              violence=True
+              break
+          if violence:
+            continue
+        texts.append(text)
+        labels.append(cat)
+neutral_texts = []
+for t in texts:
+    t = t.replace("Democrats", "officials").replace("Democrat", "official")
+    t = t.replace("Republicans", "leaders").replace("Republican", "leader")
+    t = t.replace("GOP", "party").replace("Dems", "party")
+    neutral_texts.append(t)
+
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
+vader = SentimentIntensityAnalyzer()
+
+embeddings = embedder.encode(neutral_texts, show_progress_bar=True)
+
+encoder = LabelEncoder()
+y = encoder.fit_transform(labels)
+
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(embeddings, y)
+
+sentiments = []
+for t in neutral_texts:
+    score = vader.polarity_scores(t)
+    sentiments.append(score)
+df = pd.DataFrame({
+    "neutral_texts": neutral_texts,
+    "sentiment_scores": sentiments
+})
+df.to_csv("/content/neutral_texts.csv", index=False)
