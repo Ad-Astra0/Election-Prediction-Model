@@ -1,0 +1,108 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import pandas as pd
+
+class ElectionVisualizer:
+    
+    def plot_winner_favorability(self):
+        dem_prob = np.mean(all_winners_pred == 0) * 100
+        rep_prob = 100 - dem_prob
+        mean_mape = f_df['MAPE'].mean() / 100
+        
+        labels = ['Favoring Predicted Party', 'Not Favoring']
+        sizes = [dem_prob, rep_prob]
+
+        plt.figure(figsize=(6, 6))
+        plt.pie(sizes, labels=labels, autopct='%1.2f%%', startangle=90, colors=['#FF9999', '#66B2FF'])
+        plt.title(f'Mean Predicted Party Favorability ({n_simulations} Runs)\n'
+                  f'Actual: Republican\nMean MAPE: {mean_mape:.2f}', pad=20)
+        plt.axis('equal')
+        plt.show()
+
+    def plot_factor_correctness(self):
+        mean_mse = f_df['MSE'].mean()
+        mean_f1 = f_df['F1'].mean()
+        mean_correct = (1 - mean_mse) * 100
+
+        labels = ['Correct Factors', 'Incorrect Factors']
+        sizes = [mean_correct, 100 - mean_correct]
+
+        plt.figure(figsize=(6, 6))
+        plt.pie(sizes, labels=labels, autopct='%1.2f%%', startangle=90, colors=['#99FF99', '#FF6666'])
+        plt.title(f'Factor Prediction Correctness ({n_simulations} Runs)\n'
+                  f'vs. Actual Factors\nMean MSE: {mean_mse:.4f}, F1: {mean_f1:.4f}', pad=20)
+        plt.axis('equal')
+        plt.show()
+
+    def plot_factor_comparison(self):
+        mean_predicted = all_factor_probs[:, :11].mean(axis=0)
+        actual_binary = y_factors_hist[-1][:11].astype(int)
+        df = pd.DataFrame({'Factor': factors, 'Predicted': mean_predicted, 'Actual': actual_binary})
+        df_melt = df.melt(id_vars='Factor', value_vars=['Predicted', 'Actual'], var_name='Type', value_name='Value')
+
+        plt.figure(figsize=(16, 6))
+        sns.barplot(x='Factor', y='Value', hue='Type', data=df_melt)
+        plt.title(f'Mean Predicted vs. Actual Factor Values ({n_simulations} Runs)')
+        plt.xticks(rotation=90, ha='center')
+        plt.ylabel('Value (1=True, 0=False)')
+        plt.tight_layout()
+        plt.show()
+
+    def plot_correctness_heatmap(self):
+        actual = y_factors_hist[-1][:11]
+        correctness = []
+        for p in all_factor_probs[:50, :11]:
+            correctness.append((p > 0.5).astype(int) == actual)
+        df = pd.DataFrame(correctness, columns=factors)
+        df.index = [f"Run {i+1}" for i in range(50)]
+
+        plt.figure(figsize=(12, 8))
+        sns.heatmap(df, cmap='RdYlGn', cbar_kws={'label': 'Correct (1) / Incorrect (0)'})
+        plt.title('Factor Correctness Across 50 Runs')
+        plt.xlabel('Factors')
+        plt.ylabel('Runs')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        plt.show()
+
+    def plot_metrics_trend(self):
+        runs = np.arange(1, n_simulations + 1)
+        mape_decimal = f_df['MAPE'] / 100
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(runs, f_df['MSE'], label='MSE', marker='o', markersize=5)
+        plt.plot(runs, f_df['MAE'], label='MAE', marker='d', markersize=5)
+        plt.plot(runs, f_df['F1'], label='F1 Score', marker='s', markersize=5)
+        plt.plot(runs, mape_decimal, label='MAPE', marker='^', markersize=6)
+        plt.title(f'Performance Metrics Across {n_simulations} Runs')
+        plt.xlabel('Run')
+        plt.ylabel('Value')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_metrics_boxplot(self):
+        df_metrics = pd.DataFrame({
+            'MSE': f_df['MSE'],
+            'MAE': f_df['MAE'],
+            'F1 Score': f_df['F1'],
+            'MAPE': f_df['MAPE'] / 100
+        })
+
+        plt.figure(figsize=(10, 6))
+        df_metrics.boxplot()
+        plt.title(f'Metrics Distribution Across {n_simulations} Runs')
+        plt.ylabel('Value')
+        plt.tight_layout()
+        plt.show()
+
+
+viz = ElectionVisualizer()
+viz.plot_winner_favorability()
+viz.plot_factor_correctness()
+viz.plot_factor_comparison()
+viz.plot_correctness_heatmap()
+viz.plot_metrics_trend()
+viz.plot_metrics_boxplot()
